@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>棚卸アプリ</title>
+<style>
+  :root {
+    --blue: #4a7fc9;
+    --green: #4caf7d;
+    --red: #d9534f;
+    --gray: #eee;
+    --text: #222;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", sans-serif;
+    margin: 0; padding: 12px; background: #f7f7f8; color: var(--text);
+  }
+  .card {
+    background: white; border-radius: 12px; padding: 14px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.1); margin-bottom: 12px;
+  }
+  .card-row {
+    display: flex; justify-content: space-between; padding: 6px 0;
+    border-bottom: 1px solid #eee; font-size: 16px;
+  }
+  .card-row:last-child { border-bottom: none; }
+  .card-row .label { color: #888; }
+  .card-row .value { font-weight: bold; }
+
+  #reader { width: 100%; border-radius: 10px; overflow: hidden; margin-bottom: 10px; }
+
+  .scan-btn {
+    width: 100%; padding: 16px; font-size: 18px; font-weight: bold;
+    background: var(--blue); color: white; border: none; border-radius: 10px;
+    margin-bottom: 12px;
+  }
+  .scan-btn.scanning { background: var(--red); }
+
+  .adjust-row { display: flex; gap: 8px; margin-bottom: 10px; }
+  .sys-box {
+    flex: 1; background: #eef1f5; border-radius: 10px; padding: 10px;
+    text-align: center; display: flex; flex-direction: column; justify-content: center;
+  }
+  .sys-box .sys-label { font-size: 12px; color: #888; margin-bottom: 4px; }
+  .sys-box .sys-value { font-size: 22px; font-weight: bold; }
+  .adjust-row input {
+    flex: 1; padding: 14px; font-size: 20px; border-radius: 10px;
+    border: 1px solid #ccc; text-align: center;
+  }
+  .adjust-btns { display: flex; gap: 8px; margin-bottom: 12px; }
+  .adjust-btns button {
+    flex: 1; padding: 16px 0; font-size: 20px; font-weight: bold;
+    border: none; border-radius: 10px; color: white;
+  }
+  .adjust-btns .plus { background: var(--green); }
+  .adjust-btns .minus { background: var(--red); }
+
+  .util-row { display: flex; gap: 8px; margin-bottom: 12px; }
+  .util-row button {
+    flex: 1; padding: 12px; border: 2px solid #e0a020; border-radius: 10px;
+    background: #fff3d6; color: #8a5a00; font-size: 15px; font-weight: bold;
+  }
+
+  .confirm-row button {
+    width: 100%; padding: 20px 0; font-size: 20px; font-weight: bold;
+    border: none; border-radius: 12px; color: white; background: var(--blue);
+    margin-bottom: 12px;
+  }
+
+  .log-box {
+    background: #fff8e1; border-radius: 10px; padding: 10px 14px;
+    font-size: 14px; color: #6b5a1a; min-height: 20px;
+  }
+  .error-box {
+    background: #fdecea; color: var(--red); border-radius: 10px;
+    padding: 10px 14px; font-size: 14px; margin-bottom: 10px; display: none;
+  }
+  .status-row {
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 12px; color: #888; margin-bottom: 8px;
+  }
+  .status-row button {
+    padding: 4px 10px; font-size: 12px; border-radius: 6px;
+    border: 1px solid #ccc; background: white;
+  }
+  .config-box {
+    background: #fff; border: 1px dashed #ccc; border-radius: 10px;
+    padding: 12px; margin-bottom: 12px; font-size: 13px;
+  }
+  .config-box input { width: 100%; padding: 8px; font-size: 13px; margin-top: 6px; }
+</style>
+</head>
+<body>
+
+<div id="configBox" class="config-box" style="display:none;">
+  Apps ScriptのウェブアプリURL（末尾が /exec のもの）を貼ってください。<br>
+  <input type="text" id="scriptUrlInput" placeholder="https://script.google.com/macros/s/XXXX/exec">
+  <button onclick="saveScriptUrl()" style="margin-top:8px; width:100%; padding:10px; background:var(--blue); color:white; border:none; border-radius:8px; font-weight:bold;">保存</button>
+</div>
+
+<div class="util-row">
+  <button onclick="zeroQty()">数値ゼロ</button>
+  <button onclick="resetQtyC()">数値リセット</button>
+</div>
+
+<div id="errorBox" class="error-box"></div>
+
+<div class="status-row">
+  <span id="progressText">進捗を読み込み中…</span>
+  <button onclick="reloadAll()">再読み込み</button>
+</div>
+<div class="status-row">
+  <span id="cacheStatus">品番データを読み込み中…</span>
+  <button onclick="resetScriptUrl()">接続先URLを変更</button>
+</div>
+
+<button id="scanBtn" class="scan-btn" onclick="startScan()">📷 バーコードをスキャン</button>
+<div id="readerWrap" style="display:none;"><div id="reader"></div></div>
+
+<div class="card" id="itemCard" style="display:none;">
+  <div class="card-row"><span class="label">品番</span><span class="value" id="c_item"></span></div>
+  <div class="card-row"><span class="label">品名</span><span class="value" id="c_name"></span></div>
+  <div class="card-row"><span class="label">棚番</span><span class="value" id="c_shelf"></span></div>
+  <div class="card-row"><span class="label">システム在庫</span><span class="value" id="c_qty"></span></div>
+</div>
+
+<div class="adjust-row">
+  <div class="sys-box">
+    <div class="sys-label">システム数</div>
+    <div class="sys-value" id="sysQtyDisplay">-</div>
+  </div>
+  <input type="number" inputmode="numeric" id="adjustInput" placeholder="実数を入力">
+</div>
+
+<div class="adjust-btns">
+  <button class="minus" onclick="subQty()">－計算</button>
+  <button class="plus" onclick="addQty()">＋計算</button>
+</div>
+
+<div class="confirm-row">
+  <button onclick="confirmCount()">確定上書</button>
+</div>
+
+<div class="log-box" id="logCount">まだ操作はありません。</div>
+
+<script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<script>
+  // ===== 接続設定 =====
+  let SCRIPT_URL = localStorage.getItem('inventory_script_url') || '';
+
+  function showConfigBox() {
+    const box = document.getElementById('configBox');
+    box.style.display = 'block';
+    document.getElementById('scriptUrlInput').value = '';
+    box.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+  function ensureConfigured() {
+    if (!SCRIPT_URL) {
+      showConfigBox();
+      return false;
+    }
+    return true;
+  }
+  function resetScriptUrl() {
+    localStorage.removeItem('inventory_script_url');
+    SCRIPT_URL = '';
+    showConfigBox();
+  }
+  function saveScriptUrl() {
+    const v = document.getElementById('scriptUrlInput').value.trim();
+    if (!v.startsWith('https://script.google.com/')) {
+      showError('URLの形式が違うようです。/exec で終わるURLを貼ってください。');
+      return;
+    }
+    SCRIPT_URL = v;
+    localStorage.setItem('inventory_script_url', v);
+    document.getElementById('configBox').style.display = 'none';
+    reloadAll();
+  }
+
+  // ===== APIヘルパー（JSONP方式：CORSの制約を受けない） =====
+  function jsonp(action, params) {
+    return new Promise((resolve, reject) => {
+      if (!ensureConfigured()) { reject(new Error('接続先URL未設定')); return; }
+      const callbackName = 'jsonp_cb_' + Date.now() + '_' + Math.floor(Math.random() * 100000);
+      const url = new URL(SCRIPT_URL);
+      url.searchParams.set('action', action);
+      url.searchParams.set('callback', callbackName);
+      Object.keys(params || {}).forEach(k => {
+        if (params[k] !== undefined && params[k] !== null) url.searchParams.set(k, params[k]);
+      });
+      const script = document.createElement('script');
+      let finished = false;
+      const cleanup = () => { delete window[callbackName]; script.remove(); };
+      const timer = setTimeout(() => {
+        if (finished) return;
+        finished = true; cleanup();
+        reject(new Error('通信がタイムアウトしました（接続先URLが正しいか確認してください）'));
+      }, 15000);
+      window[callbackName] = (data) => {
+        if (finished) return;
+        finished = true; clearTimeout(timer); cleanup();
+        if (!data.success) reject(new Error(data.error || 'エラーが発生しました'));
+        else resolve(data);
+      };
+      script.onerror = () => {
+        if (finished) return;
+        finished = true; clearTimeout(timer); cleanup();
+        reject(new Error('通信に失敗しました（接続先URLが正しいか確認してください）'));
+      };
+      script.src = url.toString();
+      document.body.appendChild(script);
+    });
+  }
+
+  let currentItem = null;
+  let qty = 0;
+  let scanner = null;
+  let itemIndex = {}; // barcode(正規化済み) -> item情報。起動時に一括取得してここに保持。
+
+  function showError(msg) {
+    const box = document.getElementById('errorBox');
+    box.textContent = msg;
+    box.style.display = 'block';
+    setTimeout(() => { box.style.display = 'none'; }, 4000);
+  }
+
+  // ===== 起動時：全件キャッシュ＋進捗取得 =====
+  async function loadItemIndex() {
+    const statusEl = document.getElementById('cacheStatus');
+    statusEl.textContent = '品番データを読み込み中…';
+    try {
+      const res = await jsonp('getAllItems', {});
+      itemIndex = {};
+      res.items.forEach(it => { itemIndex[it.barcode] = it; });
+      statusEl.textContent = '品番データ ' + res.items.length + ' 件を読み込み済み（スキャンはこの端末内で検索するので高速です）';
+    } catch (err) {
+      statusEl.textContent = '品番データの読み込みに失敗しました';
+      showError(err.message);
+    }
+  }
+  async function refreshProgress() {
+    if (!SCRIPT_URL) return;
+    try {
+      const res = await jsonp('getProgress', {});
+      document.getElementById('progressText').textContent =
+        '対象 ' + res.totalTarget + ' 件中 本日 ' + res.countedToday + ' 件完了（残り ' + res.remainingCount + ' 件）';
+    } catch (err) {}
+  }
+  function reloadAll() {
+    loadItemIndex();
+    refreshProgress();
+  }
+
+  // ===== スキャン =====
+  function startScan() {
+    document.getElementById('readerWrap').style.display = 'block';
+    document.getElementById('scanBtn').classList.add('scanning');
+    document.getElementById('scanBtn').textContent = '📷 スキャン中…（もう一度押すと停止）';
+    scanner = new Html5Qrcode('reader');
+    scanner.start(
+      { facingMode: { ideal: "environment" } },
+      {
+        fps: 10,
+        qrbox: { width: 300, height: 150 },
+        videoConstraints: {
+          facingMode: { ideal: "environment" },
+          width: { ideal: 1920 },
+          height: { ideal: 1080 },
+          advanced: [{ focusMode: "continuous" }]
+        }
+      },
+      (decodedText) => { stopScan(); onBarcodeScanned(decodedText); },
+      () => {}
+    ).catch(err => {
+      showError('カメラを起動できませんでした: ' + err);
+      stopScan();
+    });
+  }
+  function stopScan() {
+    if (scanner) scanner.stop().catch(() => {});
+    document.getElementById('readerWrap').style.display = 'none';
+    document.getElementById('scanBtn').classList.remove('scanning');
+    document.getElementById('scanBtn').textContent = '📷 バーコードをスキャン';
+  }
+
+  // 検索は基本ローカルキャッシュのみ。無ければ念のため1件だけサーバーに確認しに行く。
+  async function onBarcodeScanned(barcode) {
+    const normalized = String(barcode).trim();
+    const cached = itemIndex[normalized];
+    if (cached) {
+      onLookupResult(Object.assign({ found: true }, cached));
+      return;
+    }
+    try {
+      const res = await jsonp('lookupItem', { barcode: normalized });
+      if (res.found) itemIndex[normalized] = res;
+      onLookupResult(res);
+    } catch (err) {
+      showError('検索エラー: ' + err.message);
+    }
+  }
+
+  function onLookupResult(res) {
+    if (!res.found) { showError('未登録のバーコードです: ' + res.barcode); return; }
+    currentItem = res;
+    document.getElementById('itemCard').style.display = 'block';
+    document.getElementById('c_item').textContent = res.item;
+    document.getElementById('c_name').textContent = res.name;
+    document.getElementById('c_shelf').textContent = res.shelf;
+    document.getElementById('c_qty').textContent = res.systemQuantity + ' 個';
+    document.getElementById('sysQtyDisplay').textContent = res.systemQuantity;
+    qty = res.systemQuantity;
+    document.getElementById('adjustInput').value = '';
+    document.getElementById('adjustInput').focus();
+  }
+
+  // ===== 数値操作 =====
+  function addQty() {
+    const input = document.getElementById('adjustInput');
+    const n = Number(input.value);
+    if (input.value === '' || isNaN(n) || n < 0) { showError('数値を正しく入力してください'); return; }
+    qty += n;
+    input.value = qty;
+  }
+  function subQty() {
+    const input = document.getElementById('adjustInput');
+    const n = Number(input.value);
+    if (input.value === '' || isNaN(n) || n < 0) { showError('数値を正しく入力してください'); return; }
+    qty = Math.max(0, qty - n);
+    input.value = qty;
+  }
+  function zeroQty() {
+    qty = 0;
+    document.getElementById('adjustInput').value = qty;
+  }
+  function resetQtyC() {
+    qty = currentItem ? currentItem.systemQuantity : 0;
+    document.getElementById('adjustInput').value = qty;
+  }
+
+  // ===== 確定（書き込みは毎回サーバーへ） =====
+  async function confirmCount() {
+    if (!currentItem) { showError('先にバーコードをスキャンしてください'); return; }
+    const inputVal = Number(document.getElementById('adjustInput').value);
+    if (!isNaN(inputVal)) qty = inputVal; // 欄を直接編集していた場合もその値を採用
+    try {
+      const res = await jsonp('submitCount', {
+        barcode: currentItem.barcode,
+        actualQuantity: qty,
+        rowIndex: currentItem.rowIndex,
+        operator: ''
+      });
+      document.getElementById('logCount').textContent =
+        '実数「' + res.newQuantity + '」で確定しました（差異: ' + res.diff + '）。';
+      // 画面表示をその場で更新（次にスキャンし直さなくても正しい数字が見える）
+      document.getElementById('sysQtyDisplay').textContent = res.newQuantity;
+      document.getElementById('c_qty').textContent = res.newQuantity + ' 個';
+      currentItem = null;
+      document.getElementById('itemCard').style.display = 'none';
+      refreshProgress();
+      loadItemIndex(); // クラウド側の最新値で全件キャッシュを取り直す（Wi-Fi前提、224件程度なら数秒）
+    } catch (err) {
+      showError(err.message);
+    }
+  }
+
+  // ===== 初期化 =====
+  if (ensureConfigured()) reloadAll();
+</script>
+</body>
+</html>
