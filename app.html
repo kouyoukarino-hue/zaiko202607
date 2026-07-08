@@ -231,7 +231,6 @@
 <script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <script>
   // ===== 接続設定 =====
-  // 【超重要】読み込み時に前後の目に見えない改行や空白を強制的に削ぎ落とす(trim)
   let SCRIPT_URL = (localStorage.getItem('inventory_script_url') || '').trim();
 
   function showConfigBox() {
@@ -259,12 +258,10 @@
       el.textContent = '（何も保存されていません）';
       return;
     }
-    // 空白や改行を可視化して文字数をチェック
     const visible = raw.replace(/ /g, '␣').replace(/\n/g, '⏎').replace(/\t/g, '⇥');
     el.textContent = '文字数:' + raw.length + ' 内容:[' + visible + ']';
   }
   function saveScriptUrl() {
-    // 【超重要】ここでも保存時に前後の目に見えないゴミを強制排除
     const v = document.getElementById('scriptUrlInput').value.trim();
     if (!v.startsWith('https://script.google.com/')) {
       showError('URLの形式が違うようです。/exec で終わるURLを貼ってください。');
@@ -276,13 +273,10 @@
     reloadAll();
   }
 
-  // ===== APIヘルパー =====
   function jsonp(action, params) {
     return new Promise((resolve, reject) => {
       if (!ensureConfigured()) { reject(new Error('接続先URL未設定')); return; }
       const callbackName = 'jsonp_cb_' + Date.now() + '_' + Math.floor(Math.random() * 100000);
-      
-      // 安全にURLをパース
       let url;
       try {
         url = new URL(SCRIPT_URL);
@@ -290,7 +284,6 @@
         reject(new Error('保存されているURLの形式が正しくありません。再設定してください。'));
         return;
       }
-
       url.searchParams.set('action', action);
       url.searchParams.set('callback', callbackName);
       Object.keys(params || {}).forEach(k => {
@@ -332,7 +325,6 @@
     setTimeout(() => { box.style.display = 'none'; }, 4000);
   }
 
-  // ===== 起動時：全件キャッシュ＋進捗取得 =====
   async function loadItemIndex() {
     const statusEl = document.getElementById('cacheStatus');
     statusEl.textContent = '品番データを読み込み中…';
@@ -359,7 +351,6 @@
     refreshProgress();
   }
 
-  // ===== スキャン =====
   function startScan() {
     document.getElementById('readerWrap').style.display = 'block';
     document.getElementById('scanBtn').classList.add('scanning');
@@ -421,7 +412,6 @@
     document.getElementById('adjustInput').focus();
   }
 
-  // ===== 数値操作 =====
   function addQty() {
     const input = document.getElementById('adjustInput');
     const n = Number(input.value);
@@ -445,7 +435,6 @@
     document.getElementById('adjustInput').value = qty;
   }
 
-  // ===== 確定 =====
   async function confirmCount() {
     if (!currentItem) { showError('先にバーコードをスキャンしてください'); return; }
     const inputVal = Number(document.getElementById('adjustInput').value);
@@ -458,7 +447,8 @@
         operator: ''
       });
       document.getElementById('logCount').textContent =
-        '実数「' + res.newQuantity + '」で確定しました（差異: ' + res.diff + '）。';
+        '実数「' + res.newQuantity + '」で確定しました（差異: ' + res.diff + '）。' +
+        (res.newQuantity > 0 ? '　対象:TRUE' : '　対象:FALSE（在庫0）');
       
       document.getElementById('sysQtyDisplay').textContent = res.newQuantity;
       document.getElementById('c_qty').textContent = res.newQuantity + ' 個';
@@ -475,7 +465,6 @@
     }
   }
 
-  // ===== モード切替 =====
   function switchMode(mode) {
     const isInv = mode === 'inventory';
     document.getElementById('modeInventory').style.display = isInv ? 'block' : 'none';
@@ -487,7 +476,6 @@
     if (!isInv) refreshMatchSummary();
   }
 
-  // ===== マッチング作業：スキャン =====
   let scannerMatch = null;
   let matchCandidateRows = []; 
   let matchScannedBarcode = '';
@@ -558,7 +546,6 @@
     }
   }
 
-  // ===== 候補検索 =====
   let matchSearchTimer = null;
   function onMatchQueryInput() {
     clearTimeout(matchSearchTimer);
@@ -633,7 +620,6 @@
     refreshMatchSummary();
   }
 
-  // ===== ケースC：新規型番登録 =====
   function showMatchNewForm() {
     document.getElementById('matchNewForm').style.display = 'block';
   }
@@ -660,7 +646,6 @@
     }
   }
 
-  // ===== 本日の登録件数 =====
   async function refreshMatchSummary() {
     try {
       const res = await jsonp('matchGetSummary', {});
@@ -668,7 +653,6 @@
     } catch (err) {}
   }
 
-  // ===== 初期化 =====
   if (ensureConfigured()) reloadAll();
 </script>
 </body>
