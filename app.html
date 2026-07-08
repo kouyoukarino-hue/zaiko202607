@@ -122,13 +122,12 @@
 
 <div id="configBox" class="config-box" style="display:none;">
   Apps ScriptのウェブアプリURL（末尾が /exec のもの）を貼ってください。<br>
-  <input type="text" id="scriptUrlInput" placeholder="https://script.google.com/macros/s/XXXX/exec">
+  <input type="text" id="scriptUrlInput" placeholder="https://script.google.com/macros/s/XXXX/exec" autocomplete="off">
   <button onclick="saveScriptUrl()" style="margin-top:8px; width:100%; padding:10px; background:var(--blue); color:white; border:none; border-radius:8px; font-weight:bold;">保存</button>
 </div>
 
 <div id="errorBox" class="error-box"></div>
 
-<!-- ===== 棚卸モード ===== -->
 <div id="modeInventory">
 
 <div class="util-row">
@@ -164,7 +163,7 @@
     <div class="sys-label">システム数</div>
     <div class="sys-value" id="sysQtyDisplay">-</div>
   </div>
-  <input type="number" inputmode="numeric" id="adjustInput" placeholder="実数を入力">
+  <input type="number" inputmode="numeric" id="adjustInput" placeholder="実数を入力" autocomplete="off" autocorrect="off" autocapitalize="none">
 </div>
 
 <div class="adjust-btns">
@@ -179,9 +178,6 @@
 <div class="log-box" id="logCount">まだ操作はありません。</div>
 
 </div>
-<!-- ===== /棚卸モード ===== -->
-
-<!-- ===== マッチング作業モード ===== -->
 <div id="modeMatch" style="display:none;">
 
   <div class="status-row">
@@ -192,7 +188,6 @@
   <button id="matchScanBtn" class="scan-btn" onclick="startScanMatch()">📷 バーコードをスキャン</button>
   <div id="readerWrapMatch" style="display:none;"><div id="readerMatch"></div></div>
 
-  <!-- ケースA：既に登録済み -->
   <div class="card" id="matchFoundCard" style="display:none;">
     <div class="card-row"><span class="label">型番</span><span class="value" id="m_item"></span></div>
     <div class="card-row"><span class="label">品名</span><span class="value" id="m_name"></span></div>
@@ -200,13 +195,12 @@
   </div>
   <div class="log-box" id="matchFoundNote" style="display:none;">✅ 登録済みです。次のスキャンへどうぞ。</div>
 
-  <!-- ケースB/C：未登録バーコード -->
   <div id="matchUnknownBox" style="display:none;">
     <div class="log-box" style="margin-bottom:10px;">
       未登録のバーコードです（<span id="matchScannedBarcode"></span>）。型番を検索してください。
     </div>
     <div class="adjust-row" style="margin-bottom:8px;">
-      <input type="text" id="matchQueryInput" placeholder="型番・品名の一部を入力" oninput="onMatchQueryInput()" style="flex:1; padding:12px; font-size:16px; border-radius:10px; border:1px solid #ccc;">
+      <input type="text" id="matchQueryInput" placeholder="型番・品名の一部を入力" oninput="onMatchQueryInput()" style="flex:1; padding:12px; font-size:16px; border-radius:10px; border:1px solid #ccc;" autocomplete="off" autocorrect="off" autocapitalize="none">
     </div>
     <div id="matchCandidateList"></div>
 
@@ -216,14 +210,13 @@
     </div>
 
     <div id="matchNewForm" style="display:none; margin-top:10px;">
-      <input type="text" id="matchNewItem" placeholder="型番（必須）" style="width:100%; padding:10px; margin-bottom:6px; border-radius:8px; border:1px solid #ccc;">
-      <input type="text" id="matchNewName" placeholder="品名（任意）" style="width:100%; padding:10px; margin-bottom:6px; border-radius:8px; border:1px solid #ccc;">
-      <input type="text" id="matchNewMaker" placeholder="メーカー（任意）" style="width:100%; padding:10px; margin-bottom:6px; border-radius:8px; border:1px solid #ccc;">
+      <input type="text" id="matchNewItem" placeholder="型番（必須）" style="width:100%; padding:10px; margin-bottom:6px; border-radius:8px; border:1px solid #ccc;" autocomplete="off" autocorrect="off" autocapitalize="none">
+      <input type="text" id="matchNewName" placeholder="品名（任意）" style="width:100%; padding:10px; margin-bottom:6px; border-radius:8px; border:1px solid #ccc;" autocomplete="off">
+      <input type="text" id="matchNewMaker" placeholder="メーカー（任意）" style="width:100%; padding:10px; margin-bottom:6px; border-radius:8px; border:1px solid #ccc;" autocomplete="off" autocorrect="off" autocapitalize="none">
       <button onclick="submitMatchNew()" style="width:100%; padding:12px; background:var(--blue); color:white; border:none; border-radius:8px; font-weight:bold;">新規登録して紐付ける</button>
     </div>
   </div>
 
-  <!-- 上書き確認 -->
   <div id="matchOverwriteBox" style="display:none;">
     <div class="log-box" style="margin-bottom:10px;">
       「<span id="ow_item"></span>」には既にバーコード「<span id="ow_barcode"></span>」が登録されています。上書きしますか？
@@ -235,12 +228,11 @@
   </div>
 
 </div>
-<!-- ===== /マッチング作業モード ===== -->
-
 <script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <script>
   // ===== 接続設定 =====
-  let SCRIPT_URL = localStorage.getItem('inventory_script_url') || '';
+  // 【超重要】読み込み時に前後の目に見えない改行や空白を強制的に削ぎ落とす(trim)
+  let SCRIPT_URL = (localStorage.getItem('inventory_script_url') || '').trim();
 
   function showConfigBox() {
     const box = document.getElementById('configBox');
@@ -262,16 +254,17 @@
   }
   function showCurrentUrl() {
     const el = document.getElementById('debugUrlText');
-    const raw = localStorage.getItem('inventory_script_url');
+    const raw = localStorage.getItem('inventory_script_url') || '';
     if (!raw) {
       el.textContent = '（何も保存されていません）';
       return;
     }
-    // 見た目では分からない前後の空白・改行を可視化する
+    // 空白や改行を可視化して文字数をチェック
     const visible = raw.replace(/ /g, '␣').replace(/\n/g, '⏎').replace(/\t/g, '⇥');
     el.textContent = '文字数:' + raw.length + ' 内容:[' + visible + ']';
   }
   function saveScriptUrl() {
+    // 【超重要】ここでも保存時に前後の目に見えないゴミを強制排除
     const v = document.getElementById('scriptUrlInput').value.trim();
     if (!v.startsWith('https://script.google.com/')) {
       showError('URLの形式が違うようです。/exec で終わるURLを貼ってください。');
@@ -283,12 +276,21 @@
     reloadAll();
   }
 
-  // ===== APIヘルパー（JSONP方式：CORSの制約を受けない） =====
+  // ===== APIヘルパー =====
   function jsonp(action, params) {
     return new Promise((resolve, reject) => {
       if (!ensureConfigured()) { reject(new Error('接続先URL未設定')); return; }
       const callbackName = 'jsonp_cb_' + Date.now() + '_' + Math.floor(Math.random() * 100000);
-      const url = new URL(SCRIPT_URL);
+      
+      // 安全にURLをパース
+      let url;
+      try {
+        url = new URL(SCRIPT_URL);
+      } catch(e) {
+        reject(new Error('保存されているURLの形式が正しくありません。再設定してください。'));
+        return;
+      }
+
       url.searchParams.set('action', action);
       url.searchParams.set('callback', callbackName);
       Object.keys(params || {}).forEach(k => {
@@ -300,7 +302,7 @@
       const timer = setTimeout(() => {
         if (finished) return;
         finished = true; cleanup();
-        reject(new Error('通信がタイムアウトしました（接続先URLが正しいか確認してください）'));
+        reject(new Error('通信がタイムアウトしました（URL末尾の空白や改行が原因の可能性があります）'));
       }, 15000);
       window[callbackName] = (data) => {
         if (finished) return;
@@ -311,7 +313,7 @@
       script.onerror = () => {
         if (finished) return;
         finished = true; clearTimeout(timer); cleanup();
-        reject(new Error('通信に失敗しました（接続先URLが正しいか確認してください）'));
+        reject(new Error('通信に失敗しました。URLに余計な文字が入っていないか確認してください。'));
       };
       script.src = url.toString();
       document.body.appendChild(script);
@@ -321,7 +323,7 @@
   let currentItem = null;
   let qty = 0;
   let scanner = null;
-  let itemIndex = {}; // barcode(正規化済み) -> item情報。起動時に一括取得してここに保持。
+  let itemIndex = {}; 
 
   function showError(msg) {
     const box = document.getElementById('errorBox');
@@ -338,7 +340,7 @@
       const res = await jsonp('getAllItems', {});
       itemIndex = {};
       res.items.forEach(it => { itemIndex[it.barcode] = it; });
-      statusEl.textContent = '品番データ ' + res.items.length + ' 件を読み込み済み（スキャンはこの端末内で検索するので高速です）';
+      statusEl.textContent = '品番データ ' + res.items.length + ' 件を読み込み済み（高速ローカル検索有効）';
     } catch (err) {
       statusEl.textContent = '品番データの読み込みに失敗しました';
       showError(err.message);
@@ -389,7 +391,6 @@
     document.getElementById('scanBtn').textContent = '📷 バーコードをスキャン';
   }
 
-  // 検索は基本ローカルキャッシュのみ。無ければ念のため1件だけサーバーに確認しに行く。
   async function onBarcodeScanned(barcode) {
     const normalized = String(barcode).trim();
     const cached = itemIndex[normalized];
@@ -444,11 +445,11 @@
     document.getElementById('adjustInput').value = qty;
   }
 
-  // ===== 確定（書き込みは毎回サーバーへ） =====
+  // ===== 確定 =====
   async function confirmCount() {
     if (!currentItem) { showError('先にバーコードをスキャンしてください'); return; }
     const inputVal = Number(document.getElementById('adjustInput').value);
-    if (!isNaN(inputVal)) qty = inputVal; // 欄を直接編集していた場合もその値を採用
+    if (!isNaN(inputVal) && document.getElementById('adjustInput').value !== '') qty = inputVal;
     try {
       const res = await jsonp('submitCount', {
         barcode: currentItem.barcode,
@@ -458,13 +459,17 @@
       });
       document.getElementById('logCount').textContent =
         '実数「' + res.newQuantity + '」で確定しました（差異: ' + res.diff + '）。';
-      // 画面表示をその場で更新（次にスキャンし直さなくても正しい数字が見える）
+      
       document.getElementById('sysQtyDisplay').textContent = res.newQuantity;
       document.getElementById('c_qty').textContent = res.newQuantity + ' 個';
+
+      if (itemIndex[currentItem.barcode]) {
+        itemIndex[currentItem.barcode].systemQuantity = res.newQuantity;
+      }
+
       currentItem = null;
       document.getElementById('itemCard').style.display = 'none';
       refreshProgress();
-      loadItemIndex(); // クラウド側の最新値で全件キャッシュを取り直す（Wi-Fi前提、224件程度なら数秒）
     } catch (err) {
       showError(err.message);
     }
@@ -477,7 +482,6 @@
     document.getElementById('modeMatch').style.display = isInv ? 'none' : 'block';
     document.getElementById('tabInventoryBtn').classList.toggle('active', isInv);
     document.getElementById('tabMatchBtn').classList.toggle('active', !isInv);
-    // モード切替時はカメラを止めておく（つけっぱなし防止）
     stopScan();
     stopScanMatch();
     if (!isInv) refreshMatchSummary();
@@ -485,7 +489,7 @@
 
   // ===== マッチング作業：スキャン =====
   let scannerMatch = null;
-  let matchCandidateRows = []; // 現在表示中の候補（rowIndex検索用）
+  let matchCandidateRows = []; 
   let matchScannedBarcode = '';
 
   function startScanMatch() {
@@ -528,6 +532,10 @@
     document.getElementById('matchOverwriteBox').style.display = 'none';
     document.getElementById('matchQueryInput').value = '';
     document.getElementById('matchCandidateList').innerHTML = '';
+    
+    document.getElementById('matchNewItem').value = '';
+    document.getElementById('matchNewName').value = '';
+    document.getElementById('matchNewMaker').value = '';
   }
 
   async function onMatchBarcodeScanned(barcode) {
@@ -535,14 +543,12 @@
     try {
       const res = await jsonp('matchLookupByBarcode', { barcode: matchScannedBarcode });
       if (res.found) {
-        // ケースA：既に登録済み。サッと表示して次のスキャンへ促す。
         document.getElementById('matchFoundCard').style.display = 'block';
         document.getElementById('matchFoundNote').style.display = 'block';
         document.getElementById('m_item').textContent = res.item;
         document.getElementById('m_name').textContent = res.name || '';
         document.getElementById('m_maker').textContent = res.maker || '';
       } else {
-        // ケースB/C：未登録。検索欄を出す。
         document.getElementById('matchScannedBarcode').textContent = matchScannedBarcode;
         document.getElementById('matchUnknownBox').style.display = 'block';
         document.getElementById('matchQueryInput').focus();
@@ -552,7 +558,7 @@
     }
   }
 
-  // ===== ケースB：候補検索（入力のたびに軽くデバウンス） =====
+  // ===== 候補検索 =====
   let matchSearchTimer = null;
   function onMatchQueryInput() {
     clearTimeout(matchSearchTimer);
@@ -573,7 +579,7 @@
         <div class="candidate-item">
           <div class="cand-info">
             <div class="cand-item">${escapeHtml(c.item)}</div>
-            <div class="cand-name">${escapeHtml(c.name || '')}${c.maker ? '　/　' + escapeHtml(c.maker) : ''}</div>
+            <div class="cand-name">${escapeHtml(c.name || '')}${c.maker ? ' / ' + escapeHtml(c.maker) : ''}</div>
           </div>
           ${c.hasBarcode ? '<span class="cand-tag">登録済</span>' : ''}
           <button onclick="selectMatchCandidate(${i})">これ</button>
@@ -592,7 +598,7 @@
     const c = matchCandidateRows[i];
     pendingAssignRow = c;
     try {
-      const res = await jsonp('matchAssignBarcode', { barcode: matchScannedBarcode, rowIndex: c.rowIndex, overwrite: 'false' });
+      const res = await jsonp('matchAssignBarcode', { barcode: matchScannedBarcode, rowIndex: c.rowIndex, overwrite: false });
       if (res.needsConfirm) {
         document.getElementById('ow_item').textContent = res.item;
         document.getElementById('ow_barcode').textContent = res.existingBarcode;
@@ -606,7 +612,7 @@
   }
   async function confirmOverwrite() {
     try {
-      const res = await jsonp('matchAssignBarcode', { barcode: matchScannedBarcode, rowIndex: pendingAssignRow.rowIndex, overwrite: 'true' });
+      const res = await jsonp('matchAssignBarcode', { barcode: matchScannedBarcode, rowIndex: pendingAssignRow.rowIndex, overwrite: true });
       document.getElementById('matchOverwriteBox').style.display = 'none';
       onMatchAssignSuccess(res);
     } catch (err) {
