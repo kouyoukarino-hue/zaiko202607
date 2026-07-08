@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>通信テスト</title>
+<style>
+  body { font-family: sans-serif; padding: 16px; font-size: 16px; }
+  #log { white-space: pre-wrap; background: #f0f0f0; padding: 10px; border-radius: 8px; margin-top: 10px; }
+  button { padding: 14px; font-size: 16px; width: 100%; margin-top: 10px; }
+</style>
+</head>
+<body>
+
+<h3>JSONP通信テスト（このページだけ）</h3>
+<button onclick="testJsonp()">①JSONPで通信テスト</button>
+<button onclick="testImg()">②画像タグで到達テスト</button>
+<button onclick="testFetch()">③fetchで通信テスト</button>
+<div id="log">まだ何も実行していません。</div>
+
+<script>
+const URL_BASE = 'https://script.google.com/macros/s/AKfycbw_oZCNRTlFa_tSDCNdqjrZBq13d-2XXRIK956fI_E7YuxylheRBz9qjbzJrB-qiTq6WQ/exec';
+
+function log(msg) {
+  document.getElementById('log').textContent += '\n' + msg;
+}
+
+function testJsonp() {
+  document.getElementById('log').textContent = '①JSONP開始: ' + new Date().toLocaleTimeString();
+  const callbackName = 'cb_' + Date.now();
+  const url = URL_BASE + '?action=matchGetSummary&callback=' + callbackName;
+  const script = document.createElement('script');
+  const timer = setTimeout(() => {
+    log('①タイムアウト（10秒応答なし）');
+  }, 10000);
+  window[callbackName] = (data) => {
+    clearTimeout(timer);
+    log('①成功: ' + JSON.stringify(data));
+  };
+  script.onerror = (e) => {
+    clearTimeout(timer);
+    log('①onerrorが発火（スクリプト自体の読み込み失敗）');
+  };
+  script.src = url;
+  log('①リクエストURL: ' + url);
+  document.body.appendChild(script);
+}
+
+function testImg() {
+  document.getElementById('log').textContent = '②画像タグ開始: ' + new Date().toLocaleTimeString();
+  const img = new Image();
+  const timer = setTimeout(() => log('②タイムアウト（10秒反応なし）'), 10000);
+  img.onload = () => { clearTimeout(timer); log('②onload発火（到達成功・画像としては解釈できないのは正常）'); };
+  img.onerror = () => { clearTimeout(timer); log('②onerror発火（これは正常です＝サーバーには届いて、画像じゃない物が返ってきたという意味）'); };
+  img.src = URL_BASE + '?action=matchGetSummary';
+}
+
+async function testFetch() {
+  document.getElementById('log').textContent = '③fetch開始: ' + new Date().toLocaleTimeString();
+  try {
+    const res = await fetch(URL_BASE + '?action=matchGetSummary', { mode: 'no-cors' });
+    log('③fetch完了（no-corsなので中身は見えないが、通信自体は成功）type=' + res.type);
+  } catch (err) {
+    log('③fetch失敗: ' + err.message);
+  }
+}
+</script>
+</body>
+</html>
