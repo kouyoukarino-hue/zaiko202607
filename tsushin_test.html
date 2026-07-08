@@ -3,66 +3,82 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>通信テスト</title>
+<title>保存済みURL通信テスト</title>
 <style>
   body { font-family: sans-serif; padding: 16px; font-size: 16px; }
-  #log { white-space: pre-wrap; background: #f0f0f0; padding: 10px; border-radius: 8px; margin-top: 10px; }
+  #log { white-space: pre-wrap; background: #f0f0f0; padding: 10px; border-radius: 8px; margin-top: 10px; word-break: break-all; }
   button { padding: 14px; font-size: 16px; width: 100%; margin-top: 10px; }
 </style>
 </head>
 <body>
 
-<h3>JSONP通信テスト（このページだけ）</h3>
-<button onclick="testJsonp()">①JSONPで通信テスト</button>
-<button onclick="testImg()">②画像タグで到達テスト</button>
-<button onclick="testFetch()">③fetchで通信テスト</button>
+<h3>保存済みURLで通信テスト</h3>
+<p>「棚卸アプリ」で保存したURL（localStorage）を、そのまま読み出して同じテストをします。</p>
+<button onclick="showSaved()">①保存されているURLを1文字ずつ表示</button>
+<button onclick="testWithSaved()">②保存されているURLでJSONPテスト</button>
+<button onclick="testHardcoded()">③直接書いたURLでJSONPテスト（比較用）</button>
 <div id="log">まだ何も実行していません。</div>
 
 <script>
-const URL_BASE = 'https://script.google.com/macros/s/AKfycbw_oZCNRTlFa_tSDCNdqjrZBq13d-2XXRIK956fI_E7YuxylheRBz9qjbzJrB-qiTq6WQ/exec';
+const HARDCODED_URL = 'https://script.google.com/macros/s/AKfycbw_oZCNRTlFa_tSDCNdqjrZBq13d-2XXRIK956fI_E7YuxylheRBz9qjbzJrB-qiTq6WQ/exec';
 
 function log(msg) {
   document.getElementById('log').textContent += '\n' + msg;
 }
 
-function testJsonp() {
-  document.getElementById('log').textContent = '①JSONP開始: ' + new Date().toLocaleTimeString();
+function showSaved() {
+  document.getElementById('log').textContent = '';
+  const raw = localStorage.getItem('inventory_script_url');
+  if (!raw) {
+    log('（このページのlocalStorageには何も保存されていません＝app.htmlと保存場所が違う可能性があります）');
+    return;
+  }
+  log('保存値の長さ: ' + raw.length + '文字');
+  log('ハードコード値の長さ: ' + HARDCODED_URL.length + '文字');
+  log('完全一致するか: ' + (raw === HARDCODED_URL));
+  log('');
+  log('--- 1文字ずつの文字コード比較（違う場所だけ表示） ---');
+  const maxLen = Math.max(raw.length, HARDCODED_URL.length);
+  let diffCount = 0;
+  for (let i = 0; i < maxLen; i++) {
+    const a = raw[i] || '(無し)';
+    const b = HARDCODED_URL[i] || '(無し)';
+    if (a !== b) {
+      diffCount++;
+      log('位置' + i + ': 保存値=[' + a + '](U+' + (raw.charCodeAt(i) || 0).toString(16) + ') / ハードコード値=[' + b + '](U+' + (HARDCODED_URL.charCodeAt(i) || 0).toString(16) + ')');
+    }
+  }
+  if (diffCount === 0) log('違いは見つかりませんでした（完全に同一の文字列です）');
+}
+
+function testWithSaved() {
+  const raw = localStorage.getItem('inventory_script_url');
+  document.getElementById('log').textContent = '②保存値でJSONP開始: ' + new Date().toLocaleTimeString();
+  if (!raw) { log('保存値がありません'); return; }
+  runJsonpTest(raw, '②');
+}
+
+function testHardcoded() {
+  document.getElementById('log').textContent = '③ハードコード値でJSONP開始: ' + new Date().toLocaleTimeString();
+  runJsonpTest(HARDCODED_URL, '③');
+}
+
+function runJsonpTest(base, label) {
   const callbackName = 'cb_' + Date.now();
-  const url = URL_BASE + '?action=matchGetSummary&callback=' + callbackName;
+  const url = base + '?action=matchGetSummary&callback=' + callbackName;
   const script = document.createElement('script');
-  const timer = setTimeout(() => {
-    log('①タイムアウト（10秒応答なし）');
-  }, 10000);
+  const timer = setTimeout(() => log(label + 'タイムアウト（10秒応答なし）'), 10000);
   window[callbackName] = (data) => {
     clearTimeout(timer);
-    log('①成功: ' + JSON.stringify(data));
+    log(label + '成功: ' + JSON.stringify(data));
   };
-  script.onerror = (e) => {
+  script.onerror = () => {
     clearTimeout(timer);
-    log('①onerrorが発火（スクリプト自体の読み込み失敗）');
+    log(label + 'onerrorが発火（読み込み失敗）');
   };
   script.src = url;
-  log('①リクエストURL: ' + url);
+  log(label + 'リクエストURL: ' + url);
   document.body.appendChild(script);
-}
-
-function testImg() {
-  document.getElementById('log').textContent = '②画像タグ開始: ' + new Date().toLocaleTimeString();
-  const img = new Image();
-  const timer = setTimeout(() => log('②タイムアウト（10秒反応なし）'), 10000);
-  img.onload = () => { clearTimeout(timer); log('②onload発火（到達成功・画像としては解釈できないのは正常）'); };
-  img.onerror = () => { clearTimeout(timer); log('②onerror発火（これは正常です＝サーバーには届いて、画像じゃない物が返ってきたという意味）'); };
-  img.src = URL_BASE + '?action=matchGetSummary';
-}
-
-async function testFetch() {
-  document.getElementById('log').textContent = '③fetch開始: ' + new Date().toLocaleTimeString();
-  try {
-    const res = await fetch(URL_BASE + '?action=matchGetSummary', { mode: 'no-cors' });
-    log('③fetch完了（no-corsなので中身は見えないが、通信自体は成功）type=' + res.type);
-  } catch (err) {
-    log('③fetch失敗: ' + err.message);
-  }
 }
 </script>
 </body>
