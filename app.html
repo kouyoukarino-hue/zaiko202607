@@ -144,11 +144,17 @@
   <button onclick="resetScriptUrl()">接続先URLを変更</button>
 </div>
 <div class="status-row">
-  <span id="debugUrlText">（診断：今の接続先を表示するにはボタンを押してください）</span>
-  <button onclick="showCurrentUrl()">今の接続先を表示</button>
+  <span id="debugToggleLabel">▶ 診断メニュー</span>
+  <button onclick="toggleDebugBox()">開く/閉じる</button>
+</div>
+<div id="debugBox" style="display:none;">
+  <div class="status-row">
+    <span id="debugUrlText">（診断：今の接続先を表示するにはボタンを押してください）</span>
+    <button onclick="showCurrentUrl()">今の接続先を表示</button>
+  </div>
 </div>
 
-<button id="scanBtn" class="scan-btn" onclick="startScan()">📷 バーコードをスキャン</button>
+<button id="scanBtn" class="scan-btn" onclick="toggleScan()">📷 バーコードをスキャン</button>
 <div id="readerWrap" style="display:none;"><div id="reader"></div></div>
 
 <div class="card" id="itemCard" style="display:none;">
@@ -185,7 +191,7 @@
     <button onclick="refreshMatchSummary()">再読み込み</button>
   </div>
 
-  <button id="matchScanBtn" class="scan-btn" onclick="startScanMatch()">📷 バーコードをスキャン</button>
+  <button id="matchScanBtn" class="scan-btn" onclick="toggleScanMatch()">📷 バーコードをスキャン</button>
   <div id="readerWrapMatch" style="display:none;"><div id="readerMatch"></div></div>
 
   <div class="card" id="matchFoundCard" style="display:none;">
@@ -250,6 +256,13 @@
     localStorage.removeItem('inventory_script_url');
     SCRIPT_URL = '';
     showConfigBox();
+  }
+  function toggleDebugBox() {
+    const box = document.getElementById('debugBox');
+    const label = document.getElementById('debugToggleLabel');
+    const isOpen = box.style.display !== 'none';
+    box.style.display = isOpen ? 'none' : 'block';
+    label.textContent = (isOpen ? '▶' : '▼') + ' 診断メニュー';
   }
   function showCurrentUrl() {
     const el = document.getElementById('debugUrlText');
@@ -316,6 +329,7 @@
   let currentItem = null;
   let qty = 0;
   let scanner = null;
+  let isScanning = false;
   let itemIndex = {}; 
 
   function showError(msg) {
@@ -352,6 +366,7 @@
   }
 
   function startScan() {
+    isScanning = true;
     document.getElementById('readerWrap').style.display = 'block';
     document.getElementById('scanBtn').classList.add('scanning');
     document.getElementById('scanBtn').textContent = '📷 スキャン中…（もう一度押すと停止）';
@@ -376,10 +391,15 @@
     });
   }
   function stopScan() {
+    isScanning = false;
     if (scanner) scanner.stop().catch(() => {});
     document.getElementById('readerWrap').style.display = 'none';
     document.getElementById('scanBtn').classList.remove('scanning');
     document.getElementById('scanBtn').textContent = '📷 バーコードをスキャン';
+  }
+  function toggleScan() {
+    if (isScanning) stopScan();
+    else startScan();
   }
 
   async function onBarcodeScanned(barcode) {
@@ -477,10 +497,12 @@
   }
 
   let scannerMatch = null;
+  let isScanningMatch = false;
   let matchCandidateRows = []; 
   let matchScannedBarcode = '';
 
   function startScanMatch() {
+    isScanningMatch = true;
     resetMatchViews();
     document.getElementById('readerWrapMatch').style.display = 'block';
     document.getElementById('matchScanBtn').classList.add('scanning');
@@ -506,10 +528,15 @@
     });
   }
   function stopScanMatch() {
+    isScanningMatch = false;
     if (scannerMatch) scannerMatch.stop().catch(() => {});
     document.getElementById('readerWrapMatch').style.display = 'none';
     document.getElementById('matchScanBtn').classList.remove('scanning');
     document.getElementById('matchScanBtn').textContent = '📷 バーコードをスキャン';
+  }
+  function toggleScanMatch() {
+    if (isScanningMatch) stopScanMatch();
+    else startScanMatch();
   }
 
   function resetMatchViews() {
