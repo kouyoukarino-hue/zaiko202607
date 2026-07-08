@@ -137,11 +137,9 @@
 
 <div class="status-row">
   <span id="progressText">進捗を読み込み中…</span>
-  <button onclick="reloadAll()">再読み込み</button>
 </div>
 <div class="status-row">
   <span id="cacheStatus">品番データを読み込み中…</span>
-  <button onclick="resetScriptUrl()">接続先URLを変更</button>
 </div>
 <div class="status-row">
   <span id="debugToggleLabel">▶ 診断メニュー</span>
@@ -149,7 +147,15 @@
 </div>
 <div id="debugBox" style="display:none;">
   <div class="status-row">
-    <span id="debugUrlText">（診断：今の接続先を表示するにはボタンを押してください）</span>
+    <span>データを最新の状態に読み込み直す</span>
+    <button onclick="reloadAll()">再読み込み</button>
+  </div>
+  <div class="status-row">
+    <span>接続先のGAS URLを設定し直す</span>
+    <button onclick="resetScriptUrl()">接続先URLを変更</button>
+  </div>
+  <div class="status-row">
+    <span id="debugUrlText">（今の接続先を表示するにはボタンを押してください）</span>
     <button onclick="showCurrentUrl()">今の接続先を表示</button>
   </div>
 </div>
