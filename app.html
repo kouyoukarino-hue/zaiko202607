@@ -26,13 +26,13 @@
     .adjust-btns button { flex: 1; padding: 16px 0; font-size: 20px; font-weight: bold; border: none; border-radius: 10px; color: white; }
     .adjust-btns .plus { background: var(--green); }
     .adjust-btns .minus { background: var(--red); }
-    .util-row { display: flex; gap: 8px; margin-bottom: 12px; }
+    .util-row { display: flex; gap: 8px; margin-bottom: 16px; margin-top: 12px; }
     .util-row button { flex: 1; padding: 12px; border: 2px solid #e0a020; border-radius: 10px; background: #fff3d6; color: #8a5a00; font-size: 15px; font-weight: bold; }
-    .confirm-row button { width: 100%; padding: 20px 0; font-size: 20px; font-weight: bold; border: none; border-radius: 12px; color: white; background: var(--blue); margin-bottom: 16px; }
-    .log-box { background: #fff8e1; border-radius: 10px; padding: 14px; font-size: 15px; color: #6b5a1a; min-height: 20px; margin-bottom: 24px; border: 1px solid #f5e3b3; font-weight: bold; }
+    .confirm-row button { width: 100%; padding: 16px 0; font-size: 20px; font-weight: bold; border: none; border-radius: 12px; color: white; background: var(--blue); margin-bottom: 12px; }
+    .log-box { background: #fff8e1; border-radius: 10px; padding: 14px; font-size: 15px; color: #6b5a1a; min-height: 20px; margin-bottom: 12px; border: 1px solid #f5e3b3; font-weight: bold; }
     .error-box { background: #fdecea; color: var(--red); border-radius: 10px; padding: 10px 14px; font-size: 14px; margin-bottom: 10px; display: none; }
-    .status-row { display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: #888; margin-bottom: 8px; }
-    .status-row button { padding: 4px 10px; font-size: 12px; border-radius: 6px; border: 1px solid #ccc; background: white; }
+    .status-row { display: flex; justify-content: space-between; align-items: center; font-size: 13px; color: #888; margin-bottom: 8px; }
+    .status-row button { padding: 6px 12px; font-size: 13px; border-radius: 6px; border: 1px solid #ccc; background: white; font-weight: bold; color: #333; }
     .config-box { background: #fff; border: 1px dashed #ccc; border-radius: 10px; padding: 12px; margin-bottom: 12px; font-size: 13px; }
     .config-box input { width: 100%; padding: 8px; font-size: 13px; margin-top: 6px; }
     .mode-tabs { display: flex; gap: 8px; margin-bottom: 12px; }
@@ -62,11 +62,6 @@
 <div id="errorBox" class="error-box"></div>
 
 <div id="modeInventory">
-  <div class="util-row">
-    <button onclick="zeroQty()">数値ゼロ</button>
-    <button onclick="resetQtyC()">数値リセット</button>
-  </div>
-
   <button id="scanBtn" class="scan-btn" onclick="toggleScan()">📷 バーコードをスキャン</button>
   <div id="readerWrap" style="display:none;"><div id="reader"></div></div>
 
@@ -99,9 +94,121 @@
 
   <div class="log-box" id="logCount">まだ操作はありません。</div>
 
-  <div style="margin-top: 20px; border-top: 1px dashed #ccc; padding-top: 10px;">
+  <div class="util-row">
+    <button onclick="zeroQty()">数値ゼロ</button>
+    <button onclick="resetQtyC()">数値リセット</button>
+  </div>
+
+  <div style="margin-top: 20px; border-top: 1px dashed #ccc; padding-top: 12px; padding-bottom: 20px;">
     <div class="status-row">
-      <span id="debugToggleLabel">▶ 診断メニュー</span>
-      <button onclick="toggleDebugBox()">開く/閉じる</button>
+      <span id="debugToggleLabel" style="font-weight: bold; color: #555;">▶ 診断メニュー</span>
+      <button type="button" onclick="toggleDebugBox()">開く/閉じる</button>
     </div>
-    <div id="debugBox" style="display:none; background: #fff; padding: 10px; border-radius: 8px; border: 1px solid #ddd; margin-top: 5px;">
+    <div id="debugBox" style="display:none; background: #fff; padding: 12px; border-radius: 8px; border: 1px solid #ddd; margin-top: 8px;">
+      <span id="progressText" style="display:none;"></span>
+      <span id="cacheStatus" style="display:none;"></span>
+      <div class="status-row" style="margin-bottom: 12px;">
+        <span>データを最新の状態に読み込み直す</span>
+        <button type="button" onclick="reloadAll()">再読み込み</button>
+      </div>
+      <div class="status-row" style="margin-bottom: 12px;">
+        <span>接続先のGAS URLを設定し直す</span>
+        <button type="button" onclick="resetScriptUrl()">接続先URLを変更</button>
+      </div>
+      <div class="status-row">
+        <span id="debugUrlText" style="color: #999; font-size: 11px;">（今の接続先を表示するにはボタンを押してください）</span>
+        <button type="button" onclick="showCurrentUrl()">今の接続先を表示</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="modeMatch" style="display:none;">
+  <div class="status-row">
+    <span id="matchSummaryText">本日の登録件数を読み込み中…</span>
+    <button onclick="refreshMatchSummary()">再読み込み</button>
+  </div>
+
+  <button id="matchScanBtn" class="scan-btn" onclick="toggleScanMatch()">📷 バーコードをスキャン</button>
+  <div id="readerWrapMatch" style="display:none;"><div id="readerMatch"></div></div>
+
+  <div class="card" id="matchFoundCard" style="display:none;">
+    <div class="card-row"><span class="label">型番</span><span class="value" id="m_item"></span></div>
+    <div class="card-row"><span class="label">品名</span><span class="value" id="m_name"></span></div>
+    <div class="card-row"><span class="label">メーカー</span><span class="value" id="m_maker"></span></div>
+  </div>
+  <div class="log-box" id="matchFoundNote" style="display:none;">✅ 登録済みです。次のスキャンへどうぞ。</div>
+
+  <div id="matchUnknownBox" style="display:none;">
+    <div class="log-box" style="margin-bottom:10px;">
+      未登録のバーコードです（<span id="matchScannedBarcode"></span>）。型番を検索してください。
+    </div>
+    <div class="adjust-row" style="margin-bottom:8px;">
+      <input type="text" id="matchQueryInput" placeholder="型番・品名の一部を入力" oninput="onMatchQueryInput()" style="flex:1; padding:12px; font-size:16px; border-radius:10px; border:1px solid #ccc;" autocomplete="off">
+    </div>
+    <div id="matchCandidateList"></div>
+
+    <div class="util-row" style="margin-top:10px;">
+      <button onclick="showMatchNewForm()">この型番はtestに無い（新規追加）</button>
+      <button onclick="cancelMatchUnknown()">キャンセル</button>
+    </div>
+
+    <div id="matchNewForm" style="display:none; margin-top:10px;">
+      <input type="text" id="matchNewItem" placeholder="型番（必須）" style="width:100%; padding:10px; margin-bottom:6px; border-radius:8px; border:1px solid #ccc;" autocomplete="off">
+      <input type="text" id="matchNewName" placeholder="品名（任意）" style="width:100%; padding:10px; margin-bottom:6px; border-radius:8px; border:1px solid #ccc;" autocomplete="off">
+      <input type="text" id="matchNewMaker" placeholder="メーカー（任意）" style="width:100%; padding:10px; margin-bottom:6px; border-radius:8px; border:1px solid #ccc;" autocomplete="off">
+      <button onclick="submitMatchNew()" style="width:100%; padding:12px; background:var(--blue); color:white; border:none; border-radius:8px; font-weight:bold;">新規登録して紐付ける</button>
+    </div>
+  </div>
+
+  <div id="matchOverwriteBox" style="display:none;">
+    <div class="log-box" style="margin-bottom:10px;">
+      「<span id="ow_item"></span>」には既にバーコード「<span id="ow_barcode"></span>」が登録されています。上書きしますか？
+    </div>
+    <div class="adjust-btns">
+      <button class="minus" onclick="cancelOverwrite()">やめる</button>
+      <button class="plus" onclick="confirmOverwrite()">上書きする</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<script>
+  let SCRIPT_URL = (localStorage.getItem('inventory_script_url') || '').trim();
+
+  function showConfigBox() {
+    const box = document.getElementById('configBox');
+    box.style.display = 'block';
+    document.getElementById('scriptUrlInput').value = '';
+    box.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+  function ensureConfigured() {
+    if (!SCRIPT_URL) { showConfigBox(); return false; }
+    return true;
+  }
+  function resetScriptUrl() {
+    localStorage.removeItem('inventory_script_url');
+    SCRIPT_URL = '';
+    showConfigBox();
+  }
+  function toggleDebugBox() {
+    const box = document.getElementById('debugBox');
+    const label = document.getElementById('debugToggleLabel');
+    const isOpen = box.style.display !== 'none';
+    box.style.display = isOpen ? 'none' : 'block';
+    label.textContent = (isOpen ? '▶' : '▼') + ' 診断メニュー';
+  }
+  function showCurrentUrl() {
+    const el = document.getElementById('debugUrlText');
+    const raw = localStorage.getItem('inventory_script_url') || '';
+    if (!raw) { el.textContent = '（何も保存されていません）'; return; }
+    el.textContent = '文字数:' + raw.length + ' 内容:[' + raw.substring(0, 30) + '...]';
+  }
+  function saveScriptUrl() {
+    const v = document.getElementById('scriptUrlInput').value.trim();
+    if (!v.startsWith('https://script.google.com/')) {
+      showError('URLの形式が違うようです。/exec で終わるURLを貼ってください。');
+      return;
+    }
+    SCRIPT_URL = v;
+    localStorage.
