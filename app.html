@@ -1,97 +1,107 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>棚卸アプリ</title>
-<style>
-  :root {
-    --blue: #4a7fc9;
-    --green: #4caf7d;
-    --red: #d9534f;
-    --gray: #eee;
-    --text: #222;
-  }
-  * { box-sizing: border-box; }
-  body {
-    font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", sans-serif;
-    margin: 0; padding: 12px; background: #f7f7f8; color: var(--text);
-  }
-  .card {
-    background: white; border-radius: 12px; padding: 14px;
-    box-shadow: 0 1px 4px rgba(0,0,0,0.1); margin-bottom: 12px;
-  }
-  .card-row {
-    display: flex; justify-content: space-between; align-items: center; padding: 6px 0;
-    border-bottom: 1px solid #eee; font-size: 16px;
-  }
-  .card-row:last-child { border-bottom: none; }
-  .card-row .label { color: #888; }
-  .card-row .value { font-weight: bold; text-align: right; }
-  
-  .card-row .shelf-input {
-    width: 60%; padding: 6px 10px; font-size: 16px; font-weight: bold;
-    border: 1px solid #ccc; border-radius: 6px; text-align: right;
-    background: #fff3d6;
-  }
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>棚卸アプリ</title>
+  <style>
+    :root { --blue: #4a7fc9; --green: #4caf7d; --red: #d9534f; --gray: #eee; --text: #222; }
+    * { box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", sans-serif; margin: 0; padding: 12px; background: #f7f7f8; color: var(--text); }
+    .card { background: white; border-radius: 12px; padding: 14px; box-shadow: 0 1px 4px rgba(0,0,0,0.1); margin-bottom: 12px; }
+    .card-row { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px solid #eee; font-size: 16px; }
+    .card-row:last-child { border-bottom: none; }
+    .card-row .label { color: #888; }
+    .card-row .value { font-weight: bold; text-align: right; }
+    .card-row .shelf-input { width: 60%; padding: 6px 10px; font-size: 16px; font-weight: bold; border: 1px solid #ccc; border-radius: 6px; text-align: right; background: #fff3d6; }
+    #reader, #readerMatch { width: 100%; border-radius: 10px; overflow: hidden; margin-bottom: 10px; }
+    .scan-btn { width: 100%; padding: 16px; font-size: 18px; font-weight: bold; background: var(--blue); color: white; border: none; border-radius: 10px; margin-bottom: 12px; }
+    .scan-btn.scanning { background: var(--red); }
+    .adjust-row { display: flex; gap: 8px; margin-bottom: 10px; }
+    .sys-box { flex: 1; background: #eef1f5; border-radius: 10px; padding: 10px; text-align: center; display: flex; flex-direction: column; justify-content: center; }
+    .sys-box .sys-label { font-size: 12px; color: #888; margin-bottom: 4px; }
+    .sys-box .sys-value { font-size: 22px; font-weight: bold; }
+    .adjust-row input { flex: 1; padding: 14px; font-size: 20px; border-radius: 10px; border: 1px solid #ccc; text-align: center; }
+    .adjust-btns { display: flex; gap: 8px; margin-bottom: 12px; }
+    .adjust-btns button { flex: 1; padding: 16px 0; font-size: 20px; font-weight: bold; border: none; border-radius: 10px; color: white; }
+    .adjust-btns .plus { background: var(--green); }
+    .adjust-btns .minus { background: var(--red); }
+    .util-row { display: flex; gap: 8px; margin-bottom: 12px; }
+    .util-row button { flex: 1; padding: 12px; border: 2px solid #e0a020; border-radius: 10px; background: #fff3d6; color: #8a5a00; font-size: 15px; font-weight: bold; }
+    .confirm-row button { width: 100%; padding: 20px 0; font-size: 20px; font-weight: bold; border: none; border-radius: 12px; color: white; background: var(--blue); margin-bottom: 16px; }
+    .log-box { background: #fff8e1; border-radius: 10px; padding: 14px; font-size: 15px; color: #6b5a1a; min-height: 20px; margin-bottom: 24px; border: 1px solid #f5e3b3; font-weight: bold; }
+    .error-box { background: #fdecea; color: var(--red); border-radius: 10px; padding: 10px 14px; font-size: 14px; margin-bottom: 10px; display: none; }
+    .status-row { display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: #888; margin-bottom: 8px; }
+    .status-row button { padding: 4px 10px; font-size: 12px; border-radius: 6px; border: 1px solid #ccc; background: white; }
+    .config-box { background: #fff; border: 1px dashed #ccc; border-radius: 10px; padding: 12px; margin-bottom: 12px; font-size: 13px; }
+    .config-box input { width: 100%; padding: 8px; font-size: 13px; margin-top: 6px; }
+    .mode-tabs { display: flex; gap: 8px; margin-bottom: 12px; }
+    .mode-tab { flex: 1; padding: 12px 0; font-size: 15px; font-weight: bold; border: none; border-radius: 10px; background: #e6e6e8; color: #666; }
+    .mode-tab.active { background: var(--blue); color: white; }
+    .candidate-item { background: white; border: 1px solid #ddd; border-radius: 10px; padding: 10px 12px; margin-bottom: 6px; display: flex; justify-content: space-between; align-items: center; }
+    .candidate-item .cand-info { font-size: 14px; }
+    .candidate-item .cand-item { font-weight: bold; }
+    .candidate-item .cand-name { color: #666; font-size: 12px; }
+    .candidate-item .cand-tag { font-size: 11px; padding: 2px 6px; border-radius: 6px; background: #fff3d6; color: #8a5a00; }
+    .candidate-item button { padding: 8px 14px; border: none; border-radius: 8px; background: var(--blue); color: white; font-weight: bold; }
+  </style>
+</head>
+<body>
 
-  #reader { width: 100%; border-radius: 10px; overflow: hidden; margin-bottom: 10px; }
+<div class="mode-tabs">
+  <button id="tabInventoryBtn" class="mode-tab active" onclick="switchMode('inventory')">📦 棚卸</button>
+  <button id="tabMatchBtn" class="mode-tab" onclick="switchMode('match')">🔗 マッチング作業</button>
+</div>
 
-  .scan-btn {
-    width: 100%; padding: 16px; font-size: 18px; font-weight: bold;
-    background: var(--blue); color: white; border: none; border-radius: 10px;
-    margin-bottom: 12px;
-  }
-  .scan-btn.scanning { background: var(--red); }
+<div id="configBox" class="config-box" style="display:none;">
+  Apps ScriptのウェブアプリURLを貼ってください。<br>
+  <input type="text" id="scriptUrlInput" placeholder="https://script.google.com/macros/s/XXXX/exec" autocomplete="off">
+  <button onclick="saveScriptUrl()" style="margin-top:8px; width:100%; padding:10px; background:var(--blue); color:white; border:none; border-radius:8px; font-weight:bold;">保存</button>
+</div>
 
-  .adjust-row { display: flex; gap: 8px; margin-bottom: 10px; }
-  .sys-box {
-    flex: 1; background: #eef1f5; border-radius: 10px; padding: 10px;
-    text-align: center; display: flex; flex-direction: column; justify-content: center;
-  }
-  .sys-box .sys-label { font-size: 12px; color: #888; margin-bottom: 4px; }
-  .sys-box .sys-value { font-size: 22px; font-weight: bold; }
-  .adjust-row input {
-    flex: 1; padding: 14px; font-size: 20px; border-radius: 10px;
-    border: 1px solid #ccc; text-align: center;
-  }
-  .adjust-btns { display: flex; gap: 8px; margin-bottom: 12px; }
-  .adjust-btns button {
-    flex: 1; padding: 16px 0; font-size: 20px; font-weight: bold;
-    border: none; border-radius: 10px; color: white;
-  }
-  .adjust-btns .plus { background: var(--green); }
-  .adjust-btns .minus { background: var(--red); }
+<div id="errorBox" class="error-box"></div>
 
-  .util-row { display: flex; gap: 8px; margin-bottom: 12px; }
-  .util-row button {
-    flex: 1; padding: 12px; border: 2px solid #e0a020; border-radius: 10px;
-    background: #fff3d6; color: #8a5a00; font-size: 15px; font-weight: bold;
-  }
+<div id="modeInventory">
+  <div class="util-row">
+    <button onclick="zeroQty()">数値ゼロ</button>
+    <button onclick="resetQtyC()">数値リセット</button>
+  </div>
 
-  .confirm-row button {
-    width: 100%; padding: 20px 0; font-size: 20px; font-weight: bold;
-    border: none; border-radius: 12px; color: white; background: var(--blue);
-    margin-bottom: 16px;
-  }
+  <button id="scanBtn" class="scan-btn" onclick="toggleScan()">📷 バーコードをスキャン</button>
+  <div id="readerWrap" style="display:none;"><div id="reader"></div></div>
 
-  .log-box {
-    background: #fff8e1; border-radius: 10px; padding: 14px;
-    font-size: 15px; color: #6b5a1a; min-height: 20px; margin-bottom: 24px;
-    border: 1px solid #f5e3b3; font-weight: bold;
-  }
-  .error-box {
-    background: #fdecea; color: var(--red); border-radius: 10px;
-    padding: 10px 14px; font-size: 14px; margin-bottom: 10px; display: none;
-  }
-  .status-row {
-    display: flex; justify-content: space-between; align-items: center;
-    font-size: 12px; color: #888; margin-bottom: 8px;
-  }
-  .status-row button {
-    padding: 4px 10px; font-size: 12px; border-radius: 6px;
-    border: 1px solid #ccc; background: white;
-  }
-  .config-box {
-    background: #fff; border: 1px dashed #ccc; border-radius: 10px;
-    padding: 12px; margin-bottom: 12
+  <div class="card" id="itemCard" style="display:none;">
+    <div class="card-row"><span class="label">品番</span><span class="value" id="c_item"></span></div>
+    <div class="card-row"><span class="label">品名</span><span class="value" id="c_name"></span></div>
+    <div class="card-row">
+      <span class="label">棚番</span>
+      <input type="text" id="c_shelf" class="shelf-input" placeholder="例: 3-7-5" autocomplete="off">
+    </div>
+    <div class="card-row"><span class="label">システム在庫</span><span class="value" id="c_qty"></span></div>
+  </div>
+
+  <div class="adjust-row">
+    <div class="sys-box">
+      <div class="sys-label">システム数</div>
+      <div class="sys-value" id="sysQtyDisplay">-</div>
+    </div>
+    <input type="number" inputmode="numeric" id="adjustInput" placeholder="実数を入力" autocomplete="off">
+  </div>
+
+  <div class="adjust-btns">
+    <button class="minus" onclick="subQty()">－計算</button>
+    <button class="plus" onclick="addQty()">＋計算</button>
+  </div>
+
+  <div class="confirm-row">
+    <button onclick="confirmCount()">確定上書</button>
+  </div>
+
+  <div class="log-box" id="logCount">まだ操作はありません。</div>
+
+  <div style="margin-top: 20px; border-top: 1px dashed #ccc; padding-top: 10px;">
+    <div class="status-row">
+      <span id="debugToggleLabel">▶ 診断メニュー</span>
+      <button onclick="toggleDebugBox()">開く/閉じる</button>
+    </div>
+    <div id="debugBox" style="display:none; background: #fff; padding: 10px; border-radius: 8px; border: 1px solid #ddd; margin-top: 5px;">
