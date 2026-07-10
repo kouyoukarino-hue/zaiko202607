@@ -130,4 +130,412 @@
   </div>
 
   <button id="matchScanBtn" class="scan-btn" onclick="toggleScanMatch()">📷 バーコードをスキャン</button>
-  <div id="reader
+  <div id="readerWrapMatch" style="display:none;"><div id="readerMatch"></div></div>
+
+  <div class="card" id="matchFoundCard" style="display:none;">
+    <div class="card-row"><span class="label">型番</span><span class="value" id="m_item"></span></div>
+    <div class="card-row"><span class="label">品名</span><span class="value" id="m_name"></span></div>
+    <div class="card-row"><span class="label">メーカー</span><span class="value" id="m_maker"></span></div>
+  </div>
+  <div class="log-box" id="matchFoundNote" style="display:none;">✅ 登録済みです。次のスキャンへどうぞ。</div>
+
+  <div id="matchUnknownBox" style="display:none;">
+    <div class="log-box" style="margin-bottom:10px;">
+      未登録のバーコードです（<span id="matchScannedBarcode"></span>）。型番を検索してください。
+    </div>
+    <div class="adjust-row" style="margin-bottom:8px;">
+      <input type="text" id="matchQueryInput" placeholder="型番・品名の一部を入力" oninput="onMatchQueryInput()" style="flex:1; padding:12px; font-size:16px; border-radius:10px; border:1px solid #ccc;" autocomplete="off">
+    </div>
+    <div id="matchCandidateList"></div>
+
+    <div class="util-row" style="margin-top:10px;">
+      <button onclick="showMatchNewForm()">この型番はtestに無い（新規追加）</button>
+      <button onclick="cancelMatchUnknown()">キャンセル</button>
+    </div>
+
+    <div id="matchNewForm" style="display:none; margin-top:10px;">
+      <input type="text" id="matchNewItem" placeholder="型番（必須）" style="width:100%; padding:10px; margin-bottom:6px; border-radius:8px; border:1px solid #ccc;" autocomplete="off">
+      <input type="text" id="matchNewName" placeholder="品名（任意）" style="width:100%; padding:10px; margin-bottom:6px; border-radius:8px; border:1px solid #ccc;" autocomplete="off">
+      <input type="text" id="matchNewMaker" placeholder="メーカー（任意）" style="width:100%; padding:10px; margin-bottom:6px; border-radius:8px; border:1px solid #ccc;" autocomplete="off">
+      <button onclick="submitMatchNew()" style="width:100%; padding:12px; background:var(--blue); color:white; border:none; border-radius:8px; font-weight:bold;">新規登録して紐付ける</button>
+    </div>
+  </div>
+
+  <div id="matchOverwriteBox" style="display:none;">
+    <div class="log-box" style="margin-bottom:10px;">
+      「<span id="ow_item"></span>」には既にバーコード「<span id="ow_barcode"></span>」が登録されています。上書きしますか？
+    </div>
+    <div class="adjust-btns">
+      <button class="minus" onclick="cancelOverwrite()">やめる</button>
+      <button class="plus" onclick="confirmOverwrite()">上書きする</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<script>
+  let SCRIPT_URL = (localStorage.getItem('inventory_script_url') || '').trim();
+
+  function showConfigBox() {
+    const box = document.getElementById('configBox');
+    box.style.display = 'block';
+    document.getElementById('scriptUrlInput').value = '';
+    box.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+  function ensureConfigured() {
+    if (!SCRIPT_URL) { showConfigBox(); return false; }
+    return true;
+  }
+  function resetScriptUrl() {
+    localStorage.removeItem('inventory_script_url');
+    SCRIPT_URL = '';
+    showConfigBox();
+  }
+  function toggleDebugBox() {
+    const box = document.getElementById('debugBox');
+    const label = document.getElementById('debugToggleLabel');
+    const isOpen = box.style.display !== 'none';
+    box.style.display = isOpen ? 'none' : 'block';
+    label.textContent = (isOpen ? '▶' : '▼') + ' 診断メニュー';
+  }
+  function showCurrentUrl() {
+    const el = document.getElementById('debugUrlText');
+    const raw = localStorage.getItem('inventory_script_url') || '';
+    if (!raw) { el.textContent = '（何も保存されていません）'; return; }
+    el.textContent = '文字数:' + raw.length + ' 内容:[' + raw.substring(0, 30) + '...]';
+  }
+  function saveScriptUrl() {
+    const v = document.getElementById('scriptUrlInput').value.trim();
+    if (!v.startsWith('https://script.google.com/')) {
+      showError('URLの形式が違うようです。/exec で終わるURLを貼ってください。');
+      return;
+    }
+    SCRIPT_URL = v;
+    localStorage.setItem('inventory_script_url', v);
+    document.getElementById('configBox').style.display = 'none';
+    reloadAll();
+  }
+
+  function jsonp(action, params) {
+    return new Promise((resolve, reject) => {
+      if (!ensureConfigured()) { reject(new Error('接続先URL未設定')); return; }
+      const callbackName = 'jsonp_cb_' + Date.now() + '_' + Math.floor(Math.random() * 100000);
+      let url;
+      try { url = new URL(SCRIPT_URL); } catch(e) { reject(new Error('保存されているURLの形式が正しくありません。')); return; }
+      url.searchParams.set('action', action);
+      url.searchParams.set('callback', callbackName);
+      Object.keys(params || {}).forEach(k => {
+        if (params[k] !== undefined && params[k] !== null) url.searchParams.set(k, params[k]);
+      });
+      const script = document.createElement('script');
+      let finished = false;
+      const cleanup = () => { delete window[callbackName]; script.remove(); };
+      const timer = setTimeout(() => {
+        if (finished) return;
+        finished = true; cleanup();
+        reject(new Error('通信がタイムアウトしました。'));
+      }, 15000);
+      window[callbackName] = (data) => {
+        if (finished) return;
+        finished = true; clearTimeout(timer); cleanup();
+        if (!data.success) reject(new Error(data.error || 'エラーが発生しました'));
+        else resolve(data);
+      };
+      script.onerror = () => {
+        if (finished) return;
+        finished = true; clearTimeout(timer); cleanup();
+        reject(new Error('通信に失敗しました。'));
+      };
+      script.src = url.toString();
+      document.body.appendChild(script);
+    });
+  }
+
+  let currentItem = null;
+  let qty = 0;
+  let scanner = null;
+  let isScanning = false;
+  let itemIndex = {}; 
+  let lastShelf = "";
+
+  function showError(msg) {
+    const box = document.getElementById('errorBox');
+    box.textContent = msg;
+    box.style.display = 'block';
+    setTimeout(() => { box.style.display = 'none'; }, 4000);
+  }
+
+  async function loadItemIndex() {
+    try {
+      const res = await jsonp('getAllItems', {});
+      itemIndex = {};
+      res.items.forEach(it => { itemIndex[it.barcode] = it; });
+    } catch (err) { showError(err.message); }
+  }
+  async function refreshProgress() {
+    if (!SCRIPT_URL) return;
+    try { await jsonp('getProgress', {}); } catch (err) {}
+  }
+  function reloadAll() { loadItemIndex(); refreshProgress(); }
+
+  function startScan() {
+    isScanning = true;
+    document.getElementById('readerWrap').style.display = 'block';
+    document.getElementById('scanBtn').classList.add('scanning');
+    document.getElementById('scanBtn').textContent = '📷 スキャン中…（もう一度押すと停止）';
+    scanner = new Html5Qrcode('reader');
+    scanner.start(
+      { facingMode: { ideal: "environment" } },
+      { fps: 10, qrbox: { width: 300, height: 150 }, videoConstraints: { facingMode: { ideal: "environment" }, width: { ideal: 1920 }, height: { ideal: 1080 }, advanced: [{ focusMode: "continuous" }] } },
+      (decodedText) => { stopScan(); onBarcodeScanned(decodedText); },
+      () => {}
+    ).catch(err => { showError('カメラを起動できませんでした: ' + err); stopScan(); });
+  }
+  function stopScan() {
+    isScanning = false;
+    if (scanner) scanner.stop().catch(() => {});
+    document.getElementById('readerWrap').style.display = 'none';
+    document.getElementById('scanBtn').classList.remove('scanning');
+    document.getElementById('scanBtn').textContent = '📷 バーコードをスキャン';
+  }
+  function toggleScan() { if (isScanning) stopScan(); else startScan(); }
+
+  async function onBarcodeScanned(barcode) {
+    const normalized = String(barcode).trim();
+    const cached = itemIndex[normalized];
+    if (cached) { onLookupResult(Object.assign({ found: true }, cached)); return; }
+    try {
+      const res = await jsonp('lookupItem', { barcode: normalized });
+      if (res.found) itemIndex[normalized] = res;
+      onLookupResult(res);
+    } catch (err) { showError('検索エラー: ' + err.message); }
+  }
+
+  function onLookupResult(res) {
+    if (!res.found) { showError('未登録のバーコードです: ' + res.barcode); return; }
+    currentItem = res;
+    document.getElementById('itemCard').style.display = 'block';
+    document.getElementById('c_item').textContent = res.item;
+    document.getElementById('c_name').textContent = res.name;
+    
+    const currentShelfValue = (res.shelf || '').trim();
+    if (currentShelfValue !== "") {
+      document.getElementById('c_shelf').value = currentShelfValue;
+      lastShelf = currentShelfValue;
+    } else {
+      document.getElementById('c_shelf').value = lastShelf;
+    }
+    
+    const sysQty = (res.systemQuantity === '' || res.systemQuantity === undefined || res.systemQuantity === null) ? 0 : Number(res.systemQuantity);
+    document.getElementById('c_qty').textContent = sysQty + ' 個';
+    document.getElementById('sysQtyDisplay').textContent = sysQty;
+    qty = sysQty;
+    document.getElementById('adjustInput').value = '';
+    document.getElementById('adjustInput').focus();
+  }
+
+  function addQty() {
+    const input = document.getElementById('adjustInput');
+    const n = Number(input.value);
+    if (input.value === '' || isNaN(n) || n < 0) { showError('数値を正しく入力してください'); return; }
+    qty += n; input.value = qty;
+  }
+  function subQty() {
+    const input = document.getElementById('adjustInput');
+    const n = Number(input.value);
+    if (input.value === '' || isNaN(n) || n < 0) { showError('数値を正しく入力してください'); return; }
+    qty = Math.max(0, qty - n); input.value = qty;
+  }
+  function zeroQty() { qty = 0; document.getElementById('adjustInput').value = qty; }
+  function resetQtyC() {
+    const baseQty = currentItem ? ((currentItem.systemQuantity === '' || currentItem.systemQuantity === undefined || currentItem.systemQuantity === null) ? 0 : Number(currentItem.systemQuantity)) : 0;
+    qty = baseQty; document.getElementById('adjustInput').value = qty;
+  }
+
+  async function confirmCount() {
+    if (!currentItem) { showError('先にバーコードをスキャンしてください'); return; }
+    const inputVal = Number(document.getElementById('adjustInput').value);
+    if (!isNaN(inputVal) && document.getElementById('adjustInput').value !== '') qty = inputVal;
+    const typedShelf = document.getElementById('c_shelf').value.trim();
+    lastShelf = typedShelf;
+    try {
+      const res = await jsonp('submitCount', { barcode: currentItem.barcode, actualQuantity: qty, rowIndex: currentItem.rowIndex, shelf: typedShelf, operator: '' });
+      document.getElementById('logCount').textContent = '実数「' + res.newQuantity + '」、棚番「' + (typedShelf || '空欄') + '」で確定しました。';
+      document.getElementById('sysQtyDisplay').textContent = res.newQuantity;
+      document.getElementById('c_qty').textContent = res.newQuantity + ' 個';
+      if (itemIndex[currentItem.barcode]) { itemIndex[currentItem.barcode].systemQuantity = res.newQuantity; itemIndex[currentItem.barcode].shelf = typedShelf; }
+      currentItem = null;
+      document.getElementById('itemCard').style.display = 'none';
+      refreshProgress();
+    } catch (err) { showError(err.message); }
+  }
+
+  function switchMode(mode) {
+    const isInv = mode === 'inventory';
+    document.getElementById('modeInventory').style.display = isInv ? 'block' : 'none';
+    document.getElementById('modeMatch').style.display = isInv ? 'none' : 'block';
+    document.getElementById('tabInventoryBtn').classList.toggle('active', isInv);
+    document.getElementById('tabMatchBtn').classList.toggle('active', !isInv);
+    stopScan(); stopScanMatch();
+    if (!isInv) refreshMatchSummary();
+  }
+
+  let scannerMatch = null;
+  let isScanningMatch = false;
+  let matchCandidateRows = []; 
+  let matchScannedBarcode = '';
+
+  function startScanMatch() {
+    isScanningMatch = true; resetMatchViews();
+    document.getElementById('readerWrapMatch').style.display = 'block';
+    document.getElementById('matchScanBtn').classList.add('scanning');
+    document.getElementById('matchScanBtn').textContent = '📷 スキャン中…（もう一度押すと停止）';
+    scannerMatch = new Html5Qrcode('readerMatch');
+    scannerMatch.start(
+      { facingMode: { ideal: "environment" } },
+      { fps: 10, qrbox: { width: 300, height: 150 }, videoConstraints: { facingMode: { ideal: "environment" }, width: { ideal: 1920 }, height: { ideal: 1080 }, advanced: [{ focusMode: "continuous" }] } },
+      (decodedText) => { stopScanMatch(); onMatchBarcodeScanned(decodedText); },
+      () => {}
+    ).catch(err => { showError('カメラを起動できませんでした: ' + err); stopScanMatch(); });
+  }
+  function stopScanMatch() {
+    isScanningMatch = false;
+    if (scannerMatch) scannerMatch.stop().catch(() => {});
+    document.getElementById('readerWrapMatch').style.display = 'none';
+    document.getElementById('matchScanBtn').classList.remove('scanning');
+    document.getElementById('matchScanBtn').textContent = '📷 バーコードをスキャン';
+  }
+  function toggleScanMatch() { if (isScanningMatch) stopScanMatch(); else startScanMatch(); }
+
+  function resetMatchViews() {
+    document.getElementById('matchFoundCard').style.display = 'none';
+    document.getElementById('matchFoundNote').style.display = 'none';
+    document.getElementById('matchUnknownBox').style.display = 'none';
+    document.getElementById('matchNewForm').style.display = 'none';
+    document.getElementById('matchOverwriteBox').style.display = 'none';
+    document.getElementById('matchQueryInput').value = '';
+    document.getElementById('matchCandidateList').innerHTML = '';
+    document.getElementById('matchNewItem').value = '';
+    document.getElementById('matchNewName').value = '';
+    document.getElementById('matchNewMaker').value = '';
+  }
+
+  async function onMatchBarcodeScanned(barcode) {
+    matchScannedBarcode = String(barcode).trim();
+    try {
+      const res = await jsonp('matchLookupByBarcode', { barcode: matchScannedBarcode });
+      if (res.found) {
+        document.getElementById('matchFoundCard').style.display = 'block';
+        document.getElementById('matchFoundNote').style.display = 'block';
+        document.getElementById('m_item').textContent = res.item;
+        document.getElementById('m_name').textContent = res.name || '';
+        document.getElementById('m_maker').textContent = res.maker || '';
+      } else {
+        document.getElementById('matchScannedBarcode').textContent = matchScannedBarcode;
+        document.getElementById('matchUnknownBox').style.display = 'block';
+        document.getElementById('matchQueryInput').focus();
+      }
+    } catch (err) { showError('検索エラー: ' + err.message); }
+  }
+
+  let matchSearchTimer = null;
+  function onMatchQueryInput() { clearTimeout(matchSearchTimer); matchSearchTimer = setTimeout(runMatchSearch, 300); }
+  async function runMatchSearch() {
+    const q = document.getElementById('matchQueryInput').value.trim();
+    const listEl = document.getElementById('matchCandidateList');
+    if (!q) { listEl.innerHTML = ''; matchCandidateRows = []; return; }
+    try {
+      const res = await jsonp('matchSearchCandidates', { query: q });
+      matchCandidateRows = res.candidates;
+      if (res.candidates.length === 0) { listEl.innerHTML = '<div class="log-box">候補が見つかりません。</div>'; return; }
+      listEl.innerHTML = res.candidates.map((c, i) => `
+        <div class="candidate-item">
+          <div class="cand-info">
+            <div class="cand-item">${escapeHtml(c.item)}</div>
+            <div class="cand-name">${escapeHtml(c.name || '')}${c.maker ? ' / ' + escapeHtml(c.maker) : ''}</div>
+          </div>
+          ${c.hasBarcode ? '<span class="cand-tag">登録済</span>' : ''}
+          <button onclick="selectMatchCandidate(${i})">これ</button>
+        </div>
+      `).join('');
+    } catch (err) { showError('検索エラー: ' + err.message); }
+  }
+  
+  // GitHubエラーを回避するため、安全な条件文方式に変更
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, function(c) {
+      switch (c) {
+        case '&': return '&amp;';
+        case '<': return '&lt;';
+        case '>': return '&gt;';
+        case '"': return '&quot;';
+        case "'": return '&#39;';
+        default: return c;
+      }
+    });
+  }
+
+  let pendingAssignRow = null;
+  async function selectMatchCandidate(i) {
+    const c = matchCandidateRows[i]; pendingAssignRow = c;
+    try {
+      const res = await jsonp('matchAssignBarcode', { barcode: matchScannedBarcode, rowIndex: c.rowIndex, overwrite: false });
+      if (res.needsConfirm) {
+        document.getElementById('ow_item').textContent = res.item;
+        document.getElementById('ow_barcode').textContent = res.existingBarcode;
+        document.getElementById('matchOverwriteBox').style.display = 'block';
+        return;
+      }
+      onMatchAssignSuccess(res);
+    } catch (err) { showError('登録エラー: ' + err.message); }
+  }
+  async function confirmOverwrite() {
+    try {
+      const res = await jsonp('matchAssignBarcode', { barcode: matchScannedBarcode, rowIndex: pendingAssignRow.rowIndex, overwrite: true });
+      document.getElementById('matchOverwriteBox').style.display = 'none';
+      onMatchAssignSuccess(res);
+    } catch (err) { showError('登録エラー: ' + err.message); }
+  }
+  function cancelOverwrite() { document.getElementById('matchOverwriteBox').style.display = 'none'; }
+  function onMatchAssignSuccess(res) {
+    resetMatchViews();
+    document.getElementById('matchFoundCard').style.display = 'block';
+    document.getElementById('matchFoundNote').style.display = 'block';
+    document.getElementById('matchFoundNote').textContent = '✅ 「' + res.item + '」に紐付けました。';
+    document.getElementById('m_item').textContent = res.item;
+    document.getElementById('m_name').textContent = res.name || '';
+    document.getElementById('m_maker').textContent = '';
+    refreshMatchSummary();
+  }
+
+  function showMatchNewForm() { document.getElementById('matchNewForm').style.display = 'block'; }
+  function cancelMatchUnknown() { resetMatchViews(); }
+  async function submitMatchNew() {
+    const item = document.getElementById('matchNewItem').value.trim();
+    const name = document.getElementById('matchNewName').value.trim();
+    const maker = document.getElementById('matchNewMaker').value.trim();
+    if (!item) { showError('型番を入力してください'); return; }
+    try {
+      const res = await jsonp('matchRegisterNew', { barcode: matchScannedBarcode, item: item, name: name, maker: maker });
+      resetMatchViews();
+      document.getElementById('matchFoundCard').style.display = 'block';
+      document.getElementById('matchFoundNote').style.display = 'block';
+      document.getElementById('matchFoundNote').textContent = '✅ 新規「' + item + '」として登録しました。';
+      document.getElementById('m_item').textContent = item;
+      document.getElementById('m_name').textContent = name;
+      document.getElementById('m_maker').textContent = maker;
+      refreshMatchSummary();
+    } catch (err) { showError('登録エラー: ' + err.message); }
+  }
+
+  async function refreshMatchSummary() {
+    try {
+      const res = await jsonp('matchGetSummary', {});
+      document.getElementById('matchSummaryText').textContent = '本日 ' + res.countToday + ' 件登録しました';
+    } catch (err) {}
+  }
+
+  if (ensureConfigured()) reloadAll();
+</script>
+</body>
+</html>
