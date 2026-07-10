@@ -22,12 +22,19 @@
     box-shadow: 0 1px 4px rgba(0,0,0,0.1); margin-bottom: 12px;
   }
   .card-row {
-    display: flex; justify-content: space-between; padding: 6px 0;
+    display: flex; justify-content: space-between; align-items: center; padding: 6px 0;
     border-bottom: 1px solid #eee; font-size: 16px;
   }
   .card-row:last-child { border-bottom: none; }
   .card-row .label { color: #888; }
-  .card-row .value { font-weight: bold; }
+  .card-row .value { font-weight: bold; text-align: right; }
+  
+  /* 棚番入力欄用のスタイル */
+  .card-row .shelf-input {
+    width: 60%; padding: 6px 10px; font-size: 16px; font-weight: bold;
+    border: 1px solid #ccc; border-radius: 6px; text-align: right;
+    background: #fff3d6; /* 入力可能であることが分かりやすいように少し色付け */
+  }
 
   #reader { width: 100%; border-radius: 10px; overflow: hidden; margin-bottom: 10px; }
 
@@ -166,7 +173,10 @@
 <div class="card" id="itemCard" style="display:none;">
   <div class="card-row"><span class="label">品番</span><span class="value" id="c_item"></span></div>
   <div class="card-row"><span class="label">品名</span><span class="value" id="c_name"></span></div>
-  <div class="card-row"><span class="label">棚番</span><span class="value" id="c_shelf"></span></div>
+  <div class="card-row">
+    <span class="label">棚番</span>
+    <input type="text" id="c_shelf" class="shelf-input" placeholder="例: 3-7-5" autocomplete="off" autocorrect="off" autocapitalize="none">
+  </div>
   <div class="card-row"><span class="label">システム在庫</span><span class="value" id="c_qty"></span></div>
 </div>
 
@@ -337,6 +347,9 @@
   let scanner = null;
   let isScanning = false;
   let itemIndex = {}; 
+  
+  // ★重要：直前の棚番をメモリに記憶しておく変数
+  let lastShelf = "";
 
   function showError(msg) {
     const box = document.getElementById('errorBox');
@@ -430,10 +443,25 @@
     document.getElementById('itemCard').style.display = 'block';
     document.getElementById('c_item').textContent = res.item;
     document.getElementById('c_name').textContent = res.name;
-    document.getElementById('c_shelf').textContent = res.shelf;
-    document.getElementById('c_qty').textContent = res.systemQuantity + ' 個';
-    document.getElementById('sysQtyDisplay').textContent = res.systemQuantity;
-    qty = res.systemQuantity;
+    
+    // 【棚番の引き継ぎロジック】
+    const currentShelfValue = (res.shelf || '').trim();
+    if (currentShelfValue !== "") {
+      // 1. スキャンしたデータに棚番があれば、それを表示して記憶を更新
+      document.getElementById('c_shelf').value = currentShelfValue;
+      lastShelf = currentShelfValue;
+    } else {
+      // 2. データに無ければ、直前まで使っていた棚番(lastShelf)を自動セット
+      document.getElementById('c_shelf').value = lastShelf;
+    }
+    
+    // 【「 個」のバグ修正】空欄や未定義なら強制的に 0 個として扱う
+    const sysQty = (res.systemQuantity === '' || res.systemQuantity === undefined || res.systemQuantity === null) ? 0 : Number(res.systemQuantity);
+    
+    document.getElementById('c_qty').textContent = sysQty + ' 個';
+    document.getElementById('sysQtyDisplay').textContent = sysQty;
+    qty = sysQty;
+    
     document.getElementById('adjustInput').value = '';
     document.getElementById('adjustInput').focus();
   }
@@ -457,7 +485,9 @@
     document.getElementById('adjustInput').value = qty;
   }
   function resetQtyC() {
-    qty = currentItem ? currentItem.systemQuantity : 0;
+    // リセット時も安全に数値を読めるように修正
+    const baseQty = currentItem ? ((currentItem.systemQuantity === '' || currentItem.systemQuantity === undefined || currentItem.systemQuantity === null) ? 0 : Number(currentItem.systemQuantity)) : 0;
+    qty = baseQty;
     document.getElementById('adjustInput').value = qty;
   }
 
@@ -465,22 +495,31 @@
     if (!currentItem) { showError('先にバーコードをスキャンしてください'); return; }
     const inputVal = Number(document.getElementById('adjustInput').value);
     if (!isNaN(inputVal) && document.getElementById('adjustInput').value !== '') qty = inputVal;
+    
+    // 【確定時の棚番取得】画面上の入力欄（手動書き換え後）の値を手に入れる
+    const typedShelf = document.getElementById('c_shelf').value.trim();
+    
+    // 次回引き継ぎ用に最新の棚番を記憶しておく
+    lastShelf = typedShelf;
+
     try {
+      // GASの引数に「shelf: typedShelf」を追加
       const res = await jsonp('submitCount', {
         barcode: currentItem.barcode,
         actualQuantity: qty,
         rowIndex: currentItem.rowIndex,
+        shelf: typedShelf, 
         operator: ''
       });
       document.getElementById('logCount').textContent =
-        '実数「' + res.newQuantity + '」で確定しました（差異: ' + res.diff + '）。' +
-        (res.newQuantity > 0 ? '　対象:TRUE' : '　対象:FALSE（在庫0）');
-      
+        '実数「' + res.newQuantity + '」、棚番「' + (typedShelf || '空欄') + '」で確定しました。';
+        
       document.getElementById('sysQtyDisplay').textContent = res.newQuantity;
       document.getElementById('c_qty').textContent = res.newQuantity + ' 個';
 
       if (itemIndex[currentItem.barcode]) {
         itemIndex[currentItem.barcode].systemQuantity = res.newQuantity;
+        itemIndex[currentItem.barcode].shelf = typedShelf; // キャッシュも更新
       }
 
       currentItem = null;
